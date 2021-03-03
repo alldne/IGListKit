@@ -12,6 +12,23 @@
 #import <IGListKit/IGListAdapterInternal.h>
 #import <IGListKit/IGListSectionController.h>
 
+// https://stackoverflow.com/a/27035233
+@interface WeakObjectContainer : NSObject
+@property (nonatomic, readonly, weak) id object;
+@end
+
+@implementation WeakObjectContainer
+- (instancetype) initWithObject:(id)object
+{
+    if (!(self = [super init]))
+        return nil;
+
+    _object = object;
+
+    return self;
+}
+@end
+
 @implementation UICollectionViewLayout (InteractiveReordering)
 
 static void * kIGListAdapterKey = &kIGListAdapterKey;
@@ -52,7 +69,7 @@ static void * kIGListAdapterKey = &kIGListAdapterKey;
 }
 
 - (void)ig_hijackLayoutInteractiveReorderingMethodForAdapter:(IGListAdapter *)adapter {
-    objc_setAssociatedObject(self, kIGListAdapterKey, adapter, OBJC_ASSOCIATION_ASSIGN);
+    objc_setAssociatedObject(self, kIGListAdapterKey, [[WeakObjectContainer alloc] initWithObject:adapter], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 - (NSIndexPath *)ig_targetIndexPathForInteractivelyMovingItem:(NSIndexPath *)previousIndexPath
@@ -62,7 +79,7 @@ static void * kIGListAdapterKey = &kIGListAdapterKey;
     NSIndexPath *originalTarget = [self ig_targetIndexPathForInteractivelyMovingItem:previousIndexPath
                                                                         withPosition:position];
 
-    IGListAdapter *adapter = (IGListAdapter *)objc_getAssociatedObject(self, kIGListAdapterKey);
+    IGListAdapter *adapter = (IGListAdapter *)[(WeakObjectContainer*)objc_getAssociatedObject(self, kIGListAdapterKey) object];
     if (adapter == nil) {
         return originalTarget;
     }
@@ -135,7 +152,8 @@ static void * kIGListAdapterKey = &kIGListAdapterKey;
 }
 
 - (UICollectionViewLayoutInvalidationContext *)ig_cleanupInvalidationContext:(UICollectionViewLayoutInvalidationContext *)originalContext {
-    IGListAdapter *adapter = (IGListAdapter *)objc_getAssociatedObject(self, kIGListAdapterKey);
+    IGListAdapter *adapter = (IGListAdapter*)[(WeakObjectContainer *)objc_getAssociatedObject(self, kIGListAdapterKey) object];
+
     if (adapter == nil || !self.collectionView) {
         return originalContext;
     }
